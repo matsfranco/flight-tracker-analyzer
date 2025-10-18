@@ -52,7 +52,47 @@ python flight_tracker_analyzer.py sample_flight.gpx --plot --output my_flight.ht
 - `gpx_file`: Path to the GPX file (required)
 - `--plot`: Generate a 3D trajectory plot
 - `--output`: Specify output HTML file for the plot (default: flight_trajectory_3d.html)
+- `--elevation-scale`: Scale factor for elevation visualization (default: 1.0). Use values > 1.0 to exaggerate elevation changes (e.g., 10.0 for 10x scaling)
+- `--include-map`: Include background map information and external mapping links
 - `--stats`: Display flight statistics including speeds and elevation data
+
+### Background Map Integration
+
+The `--include-map` option provides geographical context for your flight trajectory:
+
+```bash
+# Generate plot with mapping information
+python flight_tracker_analyzer.py flight.gpx --plot --include-map --elevation-scale 10.0
+```
+
+This feature provides:
+- **Ground reference plane** in the 3D visualization
+- **Direct links** to Google Maps, OpenStreetMap, and Google Earth Web
+- **Flight area coordinates** for use in external mapping tools
+- **Suggestions** for advanced GPS visualization tools
+
+**External Mapping Options:**
+- **Google Earth Pro/Web**: Import the GPX file directly for satellite imagery context
+- **QGIS**: Free GIS software for professional analysis with multiple map layers
+- **GPS Visualizer**: Online tool for quick map overlay visualization
+- **Garmin Connect**: If using Garmin devices, provides native mapping integration
+
+### Elevation Scaling for Better Visualization
+
+Since horizontal distances are typically in tens of kilometers while elevation changes are only in hundreds of meters, elevation variations can be hard to see in 3D plots. Use the `--elevation-scale` parameter to exaggerate elevation changes:
+
+```bash
+# Normal scaling (default)
+python flight_tracker_analyzer.py sample_flight.gpx --plot
+
+# 5x elevation scaling - good for moderate emphasis
+python flight_tracker_analyzer.py sample_flight.gpx --plot --elevation-scale 5.0
+
+# 10x elevation scaling - for strong emphasis on elevation changes
+python flight_tracker_analyzer.py sample_flight.gpx --plot --elevation-scale 10.0
+```
+
+The scaling factor only affects the visual representation in the 3D plot. All statistics and hover information show the actual elevation values.
 
 ## Features
 
@@ -76,7 +116,9 @@ The interactive 3D plot shows:
 - Flight path as a line with markers
 - Color-coded elevation (using Viridis colorscale)
 - Interactive controls to rotate, zoom, and pan
-- Axes for longitude, latitude, and elevation
+- Consistent meter-based coordinate system for all three axes
+- Optional elevation scaling to emphasize vertical variations
+- Hover information showing actual coordinates and elevations
 
 ## Sample Output
 
@@ -122,6 +164,8 @@ for point in track.points:
 
 - Python 3.6+
 - plotly >= 5.0.0 (for 3D visualization)
+- requests >= 2.25.0 (for map integration)
+- Pillow >= 8.0.0 (for image processing, optional)
 
 ## License
 

@@ -15,6 +15,40 @@ from typing import List, Tuple, Optional
 import math
 
 
+def lat_lon_to_meters(lat: float, lon: float, ref_lat: float, ref_lon: float) -> Tuple[float, float]:
+    """
+    Convert latitude and longitude to local coordinates in meters.
+    Uses a simple equirectangular projection relative to a reference point.
+    
+    Args:
+        lat, lon: Point coordinates in decimal degrees
+        ref_lat, ref_lon: Reference point (origin) in decimal degrees
+    
+    Returns:
+        Tuple of (x, y) coordinates in meters
+    """
+    # Earth's radius in meters
+    R = 6371000
+    
+    # Convert degrees to radians
+    lat_rad = math.radians(lat)
+    lon_rad = math.radians(lon)
+    ref_lat_rad = math.radians(ref_lat)
+    ref_lon_rad = math.radians(ref_lon)
+    
+    # Calculate differences
+    delta_lat = lat_rad - ref_lat_rad
+    delta_lon = lon_rad - ref_lon_rad
+    
+    # Convert to meters using equirectangular projection
+    # x = R * delta_lon * cos(ref_lat)
+    # y = R * delta_lat
+    x = R * delta_lon * math.cos(ref_lat_rad)
+    y = R * delta_lat
+    
+    return x, y
+
+
 class FlightDataPoint:
     """Represents a single data point in a flight track."""
     
@@ -125,7 +159,34 @@ class FlightTrack:
     
     def get_trajectory_data(self) -> Tuple[List[float], List[float], List[float]]:
         """
-        Get trajectory data for plotting.
+        Get trajectory data for plotting with coordinates in meters.
+        
+        Returns:
+            Tuple of (x_meters, y_meters, elevations) where x,y are in meters
+            relative to the first point as origin.
+        """
+        if not self.points:
+            return [], [], []
+        
+        # Use first point as reference (origin)
+        ref_lat = self.points[0].lat
+        ref_lon = self.points[0].lon
+        
+        x_coords = []
+        y_coords = []
+        elevations = []
+        
+        for point in self.points:
+            x, y = lat_lon_to_meters(point.lat, point.lon, ref_lat, ref_lon)
+            x_coords.append(x)
+            y_coords.append(y)
+            elevations.append(point.ele)
+        
+        return x_coords, y_coords, elevations
+    
+    def get_trajectory_data_degrees(self) -> Tuple[List[float], List[float], List[float]]:
+        """
+        Get trajectory data in original degrees (for compatibility).
         
         Returns:
             Tuple of (latitudes, longitudes, elevations)
@@ -197,13 +258,15 @@ class GPXParser:
         return FlightTrack(points)
 
 
-def plot_3d_trajectory(track: FlightTrack, output_file: str = 'flight_trajectory_3d.html'):
+def plot_3d_trajectory(track: FlightTrack, output_file: str = 'flight_trajectory_3d.html', 
+                      elevation_scale: float = 1.0):
     """
-    Plot 3D trajectory using plotly.
+    Plot 3D trajectory using plotly with coordinates in meters.
     
     Args:
         track: FlightTrack object
         output_file: Output HTML file path
+        elevation_scale: Scale factor for elevation (e.g., 10.0 to exaggerate elevation by 10x)
     """
     try:
         import plotly.graph_objects as go
@@ -211,17 +274,20 @@ def plot_3d_trajectory(track: FlightTrack, output_file: str = 'flight_trajectory
         print("Error: plotly is required for 3D plotting. Install it with: pip install plotly")
         return
     
-    lats, lons, eles = track.get_trajectory_data()
+    x_coords, y_coords, eles = track.get_trajectory_data()
     
-    # Create 3D scatter plot
-    fig = go.Figure(data=[go.Scatter3d(
-        x=lons,
-        y=lats,
-        z=eles,
+    # Apply elevation scaling
+    scaled_eles = [ele * elevation_scale for ele in eles]
+    
+    # Create the main 3D scatter plot
+    trajectory_trace = go.Scatter3d(
+        x=x_coords,
+        y=y_coords,
+        z=scaled_eles,
         mode='lines+markers',
         marker=dict(
             size=3,
-            color=eles,
+            color=eles,  # Use original elevation for color scale
             colorscale='Viridis',
             showscale=True,
             colorbar=dict(title="Elevation (m)")
@@ -230,15 +296,31 @@ def plot_3d_trajectory(track: FlightTrack, output_file: str = 'flight_trajectory
             color='darkblue',
             width=2
         ),
-        name='Flight Path'
-    )])
+        name='Flight Path',
+        hovertemplate='<b>Position</b><br>' +
+                     'Easting: %{x:.1f}m<br>' +
+                     'Northing: %{y:.1f}m<br>' +
+                     'Elevation: %{customdata:.1f}m<br>' +
+                     '<extra></extra>',
+        customdata=eles  # Pass original elevations for hover
+    )
+    
+    fig = go.Figure(data=[trajectory_trace])
+    
+    # Get reference coordinates for title
+    ref_lat = track.points[0].lat if track.points else 0
+    ref_lon = track.points[0].lon if track.points else 0
+    
+    # Update title to show elevation scaling if applied
+    scale_info = f" (elevation scale: {elevation_scale}x)" if elevation_scale != 1.0 else ""
     
     fig.update_layout(
-        title='Flight Trajectory 3D',
+        title=f'Flight Trajectory 3D{scale_info}<br><sub>Coordinates in meters relative to origin: {ref_lat:.6f}°, {ref_lon:.6f}°</sub>',
         scene=dict(
-            xaxis_title='Longitude',
-            yaxis_title='Latitude',
-            zaxis_title='Elevation (m)',
+            xaxis_title='Easting (m)',
+            yaxis_title='Northing (m)', 
+            zaxis_title=f'Elevation (m){" x" + str(elevation_scale) if elevation_scale != 1.0 else ""}',
+            aspectmode='data'  # This ensures equal scaling on all axes
         ),
         width=1000,
         height=800
@@ -246,6 +328,7 @@ def plot_3d_trajectory(track: FlightTrack, output_file: str = 'flight_trajectory
     
     fig.write_html(output_file)
     print(f"3D trajectory plot saved to {output_file}")
+    print(f"All coordinates are in meters relative to origin: {ref_lat:.6f}°, {ref_lon:.6f}°")
 
 
 def main():
@@ -260,6 +343,9 @@ def main():
                        help='Generate 3D plot of the trajectory')
     parser.add_argument('--output', default='flight_trajectory_3d.html',
                        help='Output file for the 3D plot (default: flight_trajectory_3d.html)')
+    parser.add_argument('--elevation-scale', type=float, default=1.0,
+                       help='Scale factor for elevation visualization (default: 1.0). '
+                            'Use values > 1.0 to exaggerate elevation changes (e.g., 10.0 for 10x scaling)')
     parser.add_argument('--stats', action='store_true',
                        help='Display flight statistics')
     
@@ -272,13 +358,21 @@ def main():
     
     if args.stats:
         # Display statistics
-        lats, lons, eles = track.get_trajectory_data()
+        x_coords, y_coords, eles = track.get_trajectory_data()
+        lats, lons, _ = track.get_trajectory_data_degrees()  # For lat/lon ranges
         h_speeds = track.get_horizontal_speeds()
         v_speeds = track.get_vertical_speeds()
         
         print("\n=== Flight Statistics ===")
         print(f"Total points: {len(track.points)}")
+        print(f"Latitude range: {min(lats):.6f}° - {max(lats):.6f}°")
+        print(f"Longitude range: {min(lons):.6f}° - {max(lons):.6f}°")
         print(f"Elevation range: {min(eles):.1f}m - {max(eles):.1f}m")
+        
+        # Calculate coordinate ranges in meters
+        x_range = max(x_coords) - min(x_coords)
+        y_range = max(y_coords) - min(y_coords)
+        print(f"Flight area: {x_range:.0f}m × {y_range:.0f}m (East-West × North-South)")
         
         # Calculate horizontal speed stats (skip None values)
         valid_h_speeds = [s for s in h_speeds if s is not None]
@@ -309,8 +403,10 @@ def main():
             print(f"Flight duration: {duration/60:.1f} minutes ({duration/3600:.2f} hours)")
     
     if args.plot:
-        # Generate 3D plot
-        plot_3d_trajectory(track, args.output)
+        # Generate 3D plot with elevation scaling
+        plot_3d_trajectory(track, args.output, args.elevation_scale)
+        if args.elevation_scale != 1.0:
+            print(f"Elevation scaled by factor: {args.elevation_scale}x")
 
 
 if __name__ == '__main__':

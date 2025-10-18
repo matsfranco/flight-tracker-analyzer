@@ -5,8 +5,9 @@ Flight Tracker Analyzer - GPX File Processor
 This script processes GPX files from Garmin Flight Activities to extract
 latitude, longitude, and elevation data. It can:
 - Plot 3D trajectory of the flight path
-- Calculate horizontal speed based on lat/lon variations
-- Calculate vertical speed based on elevation changes
+- Calculate horizontal speed based on lat/lon variations (displayed in knots)
+- Calculate vertical speed based on elevation changes (displayed in ft/min)
+- Display distances in nautical miles and elevations in feet
 """
 
 import xml.etree.ElementTree as ET
@@ -52,6 +53,21 @@ def lat_lon_to_meters(lat: float, lon: float, ref_lat: float, ref_lon: float) ->
 def meters_to_feet(meters: float) -> float:
     """Convert meters to feet."""
     return meters * 3.28084
+
+
+def meters_to_nautical_miles(meters: float) -> float:
+    """Convert meters to nautical miles."""
+    return meters * 0.000539957
+
+
+def mps_to_knots(mps: float) -> float:
+    """Convert meters per second to knots (nautical miles per hour)."""
+    return mps * 1.94384
+
+
+def mps_to_fpm(mps: float) -> float:
+    """Convert meters per second to feet per minute."""
+    return mps * 196.85
 
 
 class FlightDataPoint:
@@ -335,15 +351,15 @@ def create_speed_time_chart(track: FlightTrack) -> Optional[object]:
     # Get horizontal speeds (in m/s)
     speeds_ms = track.get_horizontal_speeds()
     
-    # Extract time data and convert speeds to mph
+    # Extract time data and convert speeds to knots
     times = []
-    speeds_mph = []
+    speeds_knots = []
     
     for i, point in enumerate(track.points):
         if point.time and speeds_ms[i] is not None:
             times.append(point.time)
-            # Convert m/s to mph (1 m/s = 2.237 mph)
-            speeds_mph.append(speeds_ms[i] * 2.237)
+            # Convert m/s to knots (nautical miles per hour)
+            speeds_knots.append(mps_to_knots(speeds_ms[i]))
     
     if not times:
         return None
@@ -355,18 +371,18 @@ def create_speed_time_chart(track: FlightTrack) -> Optional[object]:
     # Create speed trace
     speed_trace = go.Scatter(
         x=elapsed_minutes,
-        y=speeds_mph,
+        y=speeds_knots,
         mode='lines+markers',
         name='Ground Speed',
         line=dict(color='darkred', width=2),
         marker=dict(size=3, color='darkred'),
         hovertemplate='<b>Speed vs Time</b><br>' +
                      'Time: %{x:.1f} min<br>' +
-                     'Speed: %{y:.1f} mph<br>' +
+                     'Speed: %{y:.1f} knots<br>' +
                      '<extra></extra>'
     )
     
-    return speed_trace, elapsed_minutes, speeds_mph
+    return speed_trace, elapsed_minutes, speeds_knots
 
 
 def plot_3d_trajectory(track: FlightTrack, output_file: str = 'flight_trajectory_3d.html', 
@@ -460,12 +476,12 @@ def plot_3d_trajectory(track: FlightTrack, output_file: str = 'flight_trajectory
     # Create speed vs time chart
     speed_chart_data = create_speed_time_chart(track)
     if speed_chart_data:
-        speed_trace, elapsed_minutes_speed, speeds_mph = speed_chart_data
+        speed_trace, elapsed_minutes_speed, speeds_knots = speed_chart_data
         fig.add_trace(speed_trace, row=3, col=1)
         
         # Update speed chart layout
         fig.update_xaxes(title_text="Time (minutes)", row=3, col=1)
-        fig.update_yaxes(title_text="Ground Speed (mph)", row=3, col=1)
+        fig.update_yaxes(title_text="Ground Speed (knots)", row=3, col=1)
     else:
         # Add a placeholder text if no time data
         fig.add_annotation(
@@ -561,34 +577,48 @@ def main():
         print(f"Elevation range: {min(eles_feet):.1f}ft - {max(eles_feet):.1f}ft")
         print(f"Elevation range (meters): {min(eles):.1f}m - {max(eles):.1f}m")
         
-        # Calculate coordinate ranges in meters
+        # Calculate coordinate ranges in meters and convert to nautical miles
         x_range = max(x_coords) - min(x_coords)
         y_range = max(y_coords) - min(y_coords)
-        print(f"Flight area: {x_range:.0f}m × {y_range:.0f}m (East-West × North-South)")
+        x_range_nm = meters_to_nautical_miles(x_range)
+        y_range_nm = meters_to_nautical_miles(y_range)
+        print(f"Flight area: {x_range_nm:.1f}NM × {y_range_nm:.1f}NM (East-West × North-South)")
+        print(f"Flight area (meters): {x_range:.0f}m × {y_range:.0f}m (East-West × North-South)")
         
         # Calculate horizontal speed stats (skip None values)
         valid_h_speeds = [s for s in h_speeds if s is not None]
         if valid_h_speeds:
             if track.points[0].time:
-                # If we have time data, speeds are in m/s
-                print(f"Horizontal speed (avg): {sum(valid_h_speeds)/len(valid_h_speeds):.1f} m/s "
-                      f"({sum(valid_h_speeds)/len(valid_h_speeds)*3.6:.1f} km/h)")
-                print(f"Horizontal speed (max): {max(valid_h_speeds):.1f} m/s "
-                      f"({max(valid_h_speeds)*3.6:.1f} km/h)")
+                # Convert to knots for aviation standard
+                avg_speed_knots = mps_to_knots(sum(valid_h_speeds)/len(valid_h_speeds))
+                max_speed_knots = mps_to_knots(max(valid_h_speeds))
+                print(f"Horizontal speed (avg): {avg_speed_knots:.1f} knots "
+                      f"({sum(valid_h_speeds)/len(valid_h_speeds):.1f} m/s)")
+                print(f"Horizontal speed (max): {max_speed_knots:.1f} knots "
+                      f"({max(valid_h_speeds):.1f} m/s)")
             else:
-                print(f"Horizontal distance (avg between points): {sum(valid_h_speeds)/len(valid_h_speeds):.1f} m")
+                avg_distance_nm = meters_to_nautical_miles(sum(valid_h_speeds)/len(valid_h_speeds))
+                print(f"Horizontal distance (avg between points): {avg_distance_nm:.2f} NM "
+                      f"({sum(valid_h_speeds)/len(valid_h_speeds):.1f} m)")
         
         # Calculate vertical speed stats
         valid_v_speeds = [s for s in v_speeds if s is not None]
         if valid_v_speeds:
             if track.points[0].time:
-                print(f"Vertical speed (avg): {sum(valid_v_speeds)/len(valid_v_speeds):.2f} m/s")
-                max_climb = max(valid_v_speeds)
-                max_descent = min(valid_v_speeds)
-                print(f"Max climb rate: {max_climb:.2f} m/s ({max_climb*60:.1f} m/min)")
-                print(f"Max descent rate: {max_descent:.2f} m/s ({max_descent*60:.1f} m/min)")
+                # Convert to ft/min for aviation standard
+                avg_vspeed_fpm = mps_to_fpm(sum(valid_v_speeds)/len(valid_v_speeds))
+                max_climb_fpm = mps_to_fpm(max(valid_v_speeds))
+                max_descent_fpm = mps_to_fpm(min(valid_v_speeds))
+                print(f"Vertical speed (avg): {avg_vspeed_fpm:.0f} ft/min "
+                      f"({sum(valid_v_speeds)/len(valid_v_speeds):.2f} m/s)")
+                print(f"Max climb rate: {max_climb_fpm:.0f} ft/min "
+                      f"({max(valid_v_speeds):.2f} m/s)")
+                print(f"Max descent rate: {max_descent_fpm:.0f} ft/min "
+                      f"({min(valid_v_speeds):.2f} m/s)")
             else:
-                print(f"Elevation change (avg between points): {sum(valid_v_speeds)/len(valid_v_speeds):.2f} m")
+                avg_elev_change_ft = meters_to_feet(sum(valid_v_speeds)/len(valid_v_speeds))
+                print(f"Elevation change (avg between points): {avg_elev_change_ft:.1f} ft "
+                      f"({sum(valid_v_speeds)/len(valid_v_speeds):.2f} m)")
         
         if track.points[0].time and track.points[-1].time:
             duration = (track.points[-1].time - track.points[0].time).total_seconds()

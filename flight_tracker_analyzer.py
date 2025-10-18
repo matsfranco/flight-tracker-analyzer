@@ -243,13 +243,9 @@ class GPXParser:
             time = None
             if time_elem is not None:
                 try:
-                    # Parse ISO 8601 format
+                    # Parse ISO 8601 format (handles both with and without microseconds)
                     time_str = time_elem.text
-                    # Handle both formats: with and without microseconds
-                    if '.' in time_str:
-                        time = datetime.fromisoformat(time_str.replace('Z', '+00:00'))
-                    else:
-                        time = datetime.fromisoformat(time_str.replace('Z', '+00:00'))
+                    time = datetime.fromisoformat(time_str.replace('Z', '+00:00'))
                 except (ValueError, AttributeError):
                     pass
             
@@ -334,6 +330,7 @@ def plot_3d_trajectory(track: FlightTrack, output_file: str = 'flight_trajectory
 def main():
     """Main function to demonstrate usage."""
     import argparse
+    import sys
     
     parser = argparse.ArgumentParser(
         description='Process GPX files from Garmin Flight Activities'
@@ -351,10 +348,25 @@ def main():
     
     args = parser.parse_args()
     
-    # Parse GPX file
-    print(f"Parsing GPX file: {args.gpx_file}")
-    track = GPXParser.parse_file(args.gpx_file)
-    print(f"Found {len(track.points)} track points")
+    # Parse GPX file with error handling
+    try:
+        print(f"Parsing GPX file: {args.gpx_file}")
+        track = GPXParser.parse_file(args.gpx_file)
+        print(f"Found {len(track.points)} track points")
+        
+        if len(track.points) == 0:
+            print("Error: No track points found in the GPX file")
+            sys.exit(1)
+            
+    except FileNotFoundError:
+        print(f"Error: File '{args.gpx_file}' not found")
+        sys.exit(1)
+    except ET.ParseError as e:
+        print(f"Error: Failed to parse GPX file: {e}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Error: Failed to process GPX file: {e}")
+        sys.exit(1)
     
     if args.stats:
         # Display statistics

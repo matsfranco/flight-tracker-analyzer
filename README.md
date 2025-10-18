@@ -160,6 +160,21 @@ for point in track.points:
     print(f"Lat: {point.lat}, Lon: {point.lon}, Elevation: {point.ele}")
 ```
 
+### Advanced Example
+
+The `advanced_example.py` script demonstrates more sophisticated analysis:
+
+```bash
+python advanced_example.py sample_flight.gpx
+```
+
+This provides detailed statistics including:
+- Trajectory information with start/end positions
+- Elevation analysis (min, max, average, total gain)
+- Speed statistics (average, median, max, min, standard deviation)
+- Flight phase analysis (climbing, cruising, descending percentages)
+- Time and distance calculations
+
 ## Requirements
 
 - Python 3.6+

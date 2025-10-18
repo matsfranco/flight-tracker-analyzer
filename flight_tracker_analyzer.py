@@ -4,10 +4,12 @@ Flight Tracker Analyzer - GPX File Processor
 
 This script processes GPX files from Garmin Flight Activities to extract
 latitude, longitude, and elevation data. It can:
-- Plot 3D trajectory of the flight path
+- Plot 3D trajectory of the flight path with multiple time-based charts
 - Calculate horizontal speed based on lat/lon variations (displayed in knots)
 - Calculate vertical speed based on elevation changes (displayed in ft/min)
+- Apply moving average filtering to reduce noise in speed signals
 - Display distances in nautical miles and elevations in feet
+- Show elevation, vertical speed, and ground speed variations over time
 """
 
 import xml.etree.ElementTree as ET
@@ -68,6 +70,44 @@ def mps_to_knots(mps: float) -> float:
 def mps_to_fpm(mps: float) -> float:
     """Convert meters per second to feet per minute."""
     return mps * 196.85
+
+
+def moving_average_filter(data: list, window_size: int = 5) -> list:
+    """
+    Apply a moving average filter to smooth noisy data.
+    
+    Args:
+        data: List of numerical values (can contain None values)
+        window_size: Size of the moving average window (default: 5)
+        
+    Returns:
+        List of smoothed values, same length as input
+    """
+    if not data or window_size <= 1:
+        return data
+    
+    # Create a copy of the data
+    smoothed = data.copy()
+    
+    # Apply moving average
+    for i in range(len(data)):
+        if data[i] is None:
+            continue
+            
+        # Collect valid values in the window around position i
+        valid_values = []
+        window_start = max(0, i - window_size // 2)
+        window_end = min(len(data), i + window_size // 2 + 1)
+        
+        for j in range(window_start, window_end):
+            if data[j] is not None:
+                valid_values.append(data[j])
+        
+        # Calculate average if we have valid values
+        if valid_values:
+            smoothed[i] = sum(valid_values) / len(valid_values)
+    
+    return smoothed
 
 
 class FlightDataPoint:
@@ -311,21 +351,38 @@ def create_elevation_time_chart(track: FlightTrack) -> Optional[object]:
     start_time = times[0]
     elapsed_minutes = [(t - start_time).total_seconds() / 60.0 for t in times]
     
-    # Create elevation trace
+    # Apply smoothing to reduce noise
+    window_size = min(8, max(3, len(elevations_feet) // 30))
+    smoothed_elevations_feet = moving_average_filter(elevations_feet, window_size)
+    
+    # Create smoothed elevation trace (main trace)
     elevation_trace = go.Scatter(
         x=elapsed_minutes,
-        y=elevations_feet,
-        mode='lines+markers',
-        name='Elevation',
-        line=dict(color='darkgreen', width=2),
-        marker=dict(size=3, color='darkgreen'),
+        y=smoothed_elevations_feet,
+        mode='lines',
+        name='Elevation (smoothed)',
+        line=dict(color='darkgreen', width=3),
         hovertemplate='<b>Elevation vs Time</b><br>' +
                      'Time: %{x:.1f} min<br>' +
-                     'Elevation: %{y:.1f} ft<br>' +
+                     'Elevation: %{y:.1f} ft (smoothed)<br>' +
                      '<extra></extra>'
     )
     
-    return elevation_trace, elapsed_minutes, elevations_feet
+    # Create raw data trace (lighter, thinner line for comparison)
+    raw_elevation_trace = go.Scatter(
+        x=elapsed_minutes,
+        y=elevations_feet,
+        mode='lines',
+        name='Elevation (raw)',
+        line=dict(color='darkgreen', width=1, dash='dot'),
+        opacity=0.4,
+        hovertemplate='<b>Elevation vs Time</b><br>' +
+                     'Time: %{x:.1f} min<br>' +
+                     'Elevation: %{y:.1f} ft (raw)<br>' +
+                     '<extra></extra>'
+    )
+    
+    return [elevation_trace, raw_elevation_trace], elapsed_minutes, smoothed_elevations_feet
 
 
 def create_speed_time_chart(track: FlightTrack) -> Optional[object]:
@@ -368,21 +425,113 @@ def create_speed_time_chart(track: FlightTrack) -> Optional[object]:
     start_time = times[0]
     elapsed_minutes = [(t - start_time).total_seconds() / 60.0 for t in times]
     
-    # Create speed trace
+    # Apply smoothing to reduce noise
+    window_size = min(10, max(3, len(speeds_knots) // 25))
+    smoothed_speeds_knots = moving_average_filter(speeds_knots, window_size)
+    
+    # Create smoothed speed trace (main trace)
     speed_trace = go.Scatter(
         x=elapsed_minutes,
-        y=speeds_knots,
-        mode='lines+markers',
-        name='Ground Speed',
-        line=dict(color='darkred', width=2),
-        marker=dict(size=3, color='darkred'),
+        y=smoothed_speeds_knots,
+        mode='lines',
+        name='Ground Speed (smoothed)',
+        line=dict(color='darkred', width=3),
         hovertemplate='<b>Speed vs Time</b><br>' +
                      'Time: %{x:.1f} min<br>' +
-                     'Speed: %{y:.1f} knots<br>' +
+                     'Speed: %{y:.1f} knots (smoothed)<br>' +
                      '<extra></extra>'
     )
     
-    return speed_trace, elapsed_minutes, speeds_knots
+    # Create raw data trace (lighter, thinner line for comparison)
+    raw_speed_trace = go.Scatter(
+        x=elapsed_minutes,
+        y=speeds_knots,
+        mode='lines',
+        name='Ground Speed (raw)',
+        line=dict(color='darkred', width=1, dash='dot'),
+        opacity=0.4,
+        hovertemplate='<b>Speed vs Time</b><br>' +
+                     'Time: %{x:.1f} min<br>' +
+                     'Speed: %{y:.1f} knots (raw)<br>' +
+                     '<extra></extra>'
+    )
+    
+    return [speed_trace, raw_speed_trace], elapsed_minutes, smoothed_speeds_knots
+
+
+def create_vertical_speed_time_chart(track: FlightTrack) -> Optional[object]:
+    """
+    Create a vertical speed vs time chart in ft/min.
+    
+    Args:
+        track: FlightTrack object
+        
+    Returns:
+        Plotly trace for vertical speed vs time chart or None if no time data
+    """
+    try:
+        import plotly.graph_objects as go
+    except ImportError:
+        return None
+    
+    # Check if we have time data
+    if not track.points or not track.points[0].time:
+        print("Warning: No time data available for vertical speed vs time chart")
+        return None
+    
+    # Get vertical speeds (in m/s)
+    vertical_speeds_ms = track.get_vertical_speeds()
+    
+    # Extract time data and convert speeds to ft/min
+    times = []
+    vertical_speeds_fpm = []
+    
+    for i, point in enumerate(track.points):
+        if point.time and vertical_speeds_ms[i] is not None:
+            times.append(point.time)
+            # Convert m/s to ft/min (feet per minute)
+            vertical_speeds_fpm.append(mps_to_fpm(vertical_speeds_ms[i]))
+    
+    if not times:
+        return None
+    
+    # Calculate elapsed time from start
+    start_time = times[0]
+    elapsed_minutes = [(t - start_time).total_seconds() / 60.0 for t in times]
+    
+    # Apply smoothing to reduce noise (window size depends on data density)
+    # Use adaptive window size: more points = larger window for better smoothing
+    window_size = min(15, max(3, len(vertical_speeds_fpm) // 20))
+    smoothed_vertical_speeds_fpm = moving_average_filter(vertical_speeds_fpm, window_size)
+    
+    # Create smoothed vertical speed trace (main trace)
+    vertical_speed_trace = go.Scatter(
+        x=elapsed_minutes,
+        y=smoothed_vertical_speeds_fpm,
+        mode='lines',
+        name='Vertical Speed (smoothed)',
+        line=dict(color='darkorange', width=3),
+        hovertemplate='<b>Vertical Speed vs Time</b><br>' +
+                     'Time: %{x:.1f} min<br>' +
+                     'Vertical Speed: %{y:.0f} ft/min (smoothed)<br>' +
+                     '<extra></extra>'
+    )
+    
+    # Create raw data trace (lighter, thinner line for comparison)
+    raw_vertical_speed_trace = go.Scatter(
+        x=elapsed_minutes,
+        y=vertical_speeds_fpm,
+        mode='lines',
+        name='Vertical Speed (raw)',
+        line=dict(color='darkorange', width=1, dash='dot'),
+        opacity=0.4,
+        hovertemplate='<b>Vertical Speed vs Time</b><br>' +
+                     'Time: %{x:.1f} min<br>' +
+                     'Vertical Speed: %{y:.0f} ft/min (raw)<br>' +
+                     '<extra></extra>'
+    )
+    
+    return [vertical_speed_trace, raw_vertical_speed_trace], elapsed_minutes, smoothed_vertical_speeds_fpm
 
 
 def plot_3d_trajectory(track: FlightTrack, output_file: str = 'flight_trajectory_3d.html', 
@@ -411,17 +560,18 @@ def plot_3d_trajectory(track: FlightTrack, output_file: str = 'flight_trajectory
     # Apply elevation scaling for 3D plot
     scaled_eles = [ele * elevation_scale for ele in eles]
     
-    # Create subplot layout: 3D plot on top, elevation and speed charts below
+    # Create subplot layout: 3D plot on top, then elevation, vertical speed, and ground speed charts
     fig = make_subplots(
-        rows=3, cols=1,
-        row_heights=[0.6, 0.2, 0.2],
+        rows=4, cols=1,
+        row_heights=[0.5, 0.17, 0.17, 0.16],
         specs=[
             [{"type": "scatter3d"}],
             [{"type": "xy"}],
+            [{"type": "xy"}],
             [{"type": "xy"}]
         ],
-        subplot_titles=("3D Flight Trajectory", "Elevation vs Time", "Ground Speed vs Time"),
-        vertical_spacing=0.08
+        subplot_titles=("3D Flight Trajectory", "Elevation vs Time", "Vertical Speed vs Time", "Ground Speed vs Time"),
+        vertical_spacing=0.06
     )
     
     # Create the 3D trajectory trace
@@ -435,7 +585,13 @@ def plot_3d_trajectory(track: FlightTrack, output_file: str = 'flight_trajectory
             color=eles_feet,  # Use elevation in feet for color scale
             colorscale='Viridis',
             showscale=True,
-            colorbar=dict(title="Elevation (ft)", x=1.02, y=0.8)  # Position colorbar to the right
+            colorbar=dict(
+                title="Elevation (ft)", 
+                x=1.15,  # Move further right to avoid legend overlap
+                y=0.9,   # Position higher on the 3D chart
+                len=0.4, # Make it shorter
+                thickness=20 # Make it thinner
+            )  # Position colorbar away from legends
         ),
         line=dict(
             color='darkblue',
@@ -456,8 +612,10 @@ def plot_3d_trajectory(track: FlightTrack, output_file: str = 'flight_trajectory
     # Create elevation vs time chart
     elevation_chart_data = create_elevation_time_chart(track)
     if elevation_chart_data:
-        elevation_trace, elapsed_minutes, elevations_feet = elevation_chart_data
-        fig.add_trace(elevation_trace, row=2, col=1)
+        elevation_traces, elapsed_minutes, elevations_feet = elevation_chart_data
+        # Add both smoothed and raw traces
+        for trace in elevation_traces:
+            fig.add_trace(trace, row=2, col=1)
         
         # Update elevation chart layout
         fig.update_xaxes(title_text="Time (minutes)", row=2, col=1)
@@ -473,24 +631,48 @@ def plot_3d_trajectory(track: FlightTrack, output_file: str = 'flight_trajectory
             row=2, col=1
         )
     
-    # Create speed vs time chart
-    speed_chart_data = create_speed_time_chart(track)
-    if speed_chart_data:
-        speed_trace, elapsed_minutes_speed, speeds_knots = speed_chart_data
-        fig.add_trace(speed_trace, row=3, col=1)
+    # Create vertical speed vs time chart
+    vertical_speed_chart_data = create_vertical_speed_time_chart(track)
+    if vertical_speed_chart_data:
+        vertical_speed_traces, elapsed_minutes_vspeed, vertical_speeds_fpm = vertical_speed_chart_data
+        # Add both smoothed and raw traces
+        for trace in vertical_speed_traces:
+            fig.add_trace(trace, row=3, col=1)
         
-        # Update speed chart layout
+        # Update vertical speed chart layout
         fig.update_xaxes(title_text="Time (minutes)", row=3, col=1)
-        fig.update_yaxes(title_text="Ground Speed (knots)", row=3, col=1)
+        fig.update_yaxes(title_text="Vertical Speed (ft/min)", row=3, col=1)
     else:
         # Add a placeholder text if no time data
         fig.add_annotation(
-            text="No time data available for speed chart",
+            text="No time data available for vertical speed chart",
             x=0.5, y=0.5,
             xref="x3", yref="y3",
             showarrow=False,
             font=dict(size=12, color="gray"),
             row=3, col=1
+        )
+    
+    # Create speed vs time chart
+    speed_chart_data = create_speed_time_chart(track)
+    if speed_chart_data:
+        speed_traces, elapsed_minutes_speed, speeds_knots = speed_chart_data
+        # Add both smoothed and raw traces
+        for trace in speed_traces:
+            fig.add_trace(trace, row=4, col=1)
+        
+        # Update speed chart layout
+        fig.update_xaxes(title_text="Time (minutes)", row=4, col=1)
+        fig.update_yaxes(title_text="Ground Speed (knots)", row=4, col=1)
+    else:
+        # Add a placeholder text if no time data
+        fig.add_annotation(
+            text="No time data available for speed chart",
+            x=0.5, y=0.5,
+            xref="x4", yref="y4",
+            showarrow=False,
+            font=dict(size=12, color="gray"),
+            row=4, col=1
         )
     
     # Get reference coordinates for title
@@ -509,9 +691,16 @@ def plot_3d_trajectory(track: FlightTrack, output_file: str = 'flight_trajectory
             zaxis_title=f'Elevation (m){" x" + str(elevation_scale) if elevation_scale != 1.0 else ""}',
             aspectmode='data'  # This ensures equal scaling on all axes
         ),
-        width=1400,
-        height=1000,  # Increased height for three charts
-        showlegend=True
+        width=1500,  # Increased width to accommodate colorbar
+        height=1200,  # Increased height for four charts
+        showlegend=True,
+        legend=dict(
+            x=1.02,  # Position legend to the right
+            y=0.5,   # Center vertically
+            bgcolor="rgba(255,255,255,0.8)",  # Semi-transparent background
+            bordercolor="rgba(0,0,0,0.2)",
+            borderwidth=1
+        )
     )
     
     fig.write_html(output_file)

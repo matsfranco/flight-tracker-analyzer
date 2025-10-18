@@ -127,13 +127,25 @@ The interactive 3D plot shows:
 - Consistent meter-based coordinate system for spatial axes
 - Optional elevation scaling to emphasize vertical variations
 - Hover information showing actual coordinates and elevations in feet
+- Optimized layout with properly positioned colorbar and legend to avoid overlaps
 
 ### Multiple Chart Display
 
-The visualization now includes three charts in a single view:
-- **3D Flight Trajectory** (top): Spatial view of the flight path
-- **Elevation vs Time** (middle): Shows altitude changes throughout the flight in feet
-- **Ground Speed vs Time** (bottom): Displays speed variations in knots over time
+The visualization now includes four charts in a single view:
+- **3D Flight Trajectory** (top): Spatial view of the flight path with elevation scaling
+- **Elevation vs Time** (second): Shows altitude changes throughout the flight in feet
+- **Vertical Speed vs Time** (third): Displays climb/descent rates in ft/min over time with noise filtering
+- **Ground Speed vs Time** (bottom): Shows speed variations in knots over time with noise filtering
+
+### Signal Smoothing
+
+Both vertical speed and ground speed charts include automatic noise filtering:
+- **Smoothed data** (thick lines): Moving average filtered signals showing overall trends
+- **Raw data** (thin dotted lines): Original unfiltered data for reference
+- **Adaptive filtering**: Window size automatically adjusts based on data density
+- **Better visualization**: Reduces high-frequency noise while preserving important flight patterns
+
+This is particularly useful for high-frequency GPS data where small measurement errors can create noisy speed profiles that obscure the actual flight characteristics.
 
 ## Sample Output
 

@@ -49,6 +49,11 @@ def lat_lon_to_meters(lat: float, lon: float, ref_lat: float, ref_lon: float) ->
     return x, y
 
 
+def meters_to_feet(meters: float) -> float:
+    """Convert meters to feet."""
+    return meters * 3.28084
+
+
 class FlightDataPoint:
     """Represents a single data point in a flight track."""
     
@@ -254,10 +259,120 @@ class GPXParser:
         return FlightTrack(points)
 
 
+def create_elevation_time_chart(track: FlightTrack) -> Optional[object]:
+    """
+    Create an elevation vs time chart.
+    
+    Args:
+        track: FlightTrack object
+        
+    Returns:
+        Plotly trace for elevation vs time chart or None if no time data
+    """
+    try:
+        import plotly.graph_objects as go
+    except ImportError:
+        return None
+    
+    # Check if we have time data
+    if not track.points or not track.points[0].time:
+        print("Warning: No time data available for elevation vs time chart")
+        return None
+    
+    # Extract time and elevation data
+    times = []
+    elevations_feet = []
+    
+    for point in track.points:
+        if point.time:
+            times.append(point.time)
+            elevations_feet.append(meters_to_feet(point.ele))
+    
+    if not times:
+        return None
+    
+    # Calculate elapsed time from start
+    start_time = times[0]
+    elapsed_minutes = [(t - start_time).total_seconds() / 60.0 for t in times]
+    
+    # Create elevation trace
+    elevation_trace = go.Scatter(
+        x=elapsed_minutes,
+        y=elevations_feet,
+        mode='lines+markers',
+        name='Elevation',
+        line=dict(color='darkgreen', width=2),
+        marker=dict(size=3, color='darkgreen'),
+        hovertemplate='<b>Elevation vs Time</b><br>' +
+                     'Time: %{x:.1f} min<br>' +
+                     'Elevation: %{y:.1f} ft<br>' +
+                     '<extra></extra>'
+    )
+    
+    return elevation_trace, elapsed_minutes, elevations_feet
+
+
+def create_speed_time_chart(track: FlightTrack) -> Optional[object]:
+    """
+    Create a speed vs time chart.
+    
+    Args:
+        track: FlightTrack object
+        
+    Returns:
+        Plotly trace for speed vs time chart or None if no time data
+    """
+    try:
+        import plotly.graph_objects as go
+    except ImportError:
+        return None
+    
+    # Check if we have time data
+    if not track.points or not track.points[0].time:
+        print("Warning: No time data available for speed vs time chart")
+        return None
+    
+    # Get horizontal speeds (in m/s)
+    speeds_ms = track.get_horizontal_speeds()
+    
+    # Extract time data and convert speeds to mph
+    times = []
+    speeds_mph = []
+    
+    for i, point in enumerate(track.points):
+        if point.time and speeds_ms[i] is not None:
+            times.append(point.time)
+            # Convert m/s to mph (1 m/s = 2.237 mph)
+            speeds_mph.append(speeds_ms[i] * 2.237)
+    
+    if not times:
+        return None
+    
+    # Calculate elapsed time from start
+    start_time = times[0]
+    elapsed_minutes = [(t - start_time).total_seconds() / 60.0 for t in times]
+    
+    # Create speed trace
+    speed_trace = go.Scatter(
+        x=elapsed_minutes,
+        y=speeds_mph,
+        mode='lines+markers',
+        name='Ground Speed',
+        line=dict(color='darkred', width=2),
+        marker=dict(size=3, color='darkred'),
+        hovertemplate='<b>Speed vs Time</b><br>' +
+                     'Time: %{x:.1f} min<br>' +
+                     'Speed: %{y:.1f} mph<br>' +
+                     '<extra></extra>'
+    )
+    
+    return speed_trace, elapsed_minutes, speeds_mph
+
+
 def plot_3d_trajectory(track: FlightTrack, output_file: str = 'flight_trajectory_3d.html', 
                       elevation_scale: float = 1.0):
     """
-    Plot 3D trajectory using plotly with coordinates in meters.
+    Plot 3D trajectory and elevation vs time chart using plotly with subplots.
     
     Args:
         track: FlightTrack object
@@ -266,16 +381,34 @@ def plot_3d_trajectory(track: FlightTrack, output_file: str = 'flight_trajectory
     """
     try:
         import plotly.graph_objects as go
+        from plotly.subplots import make_subplots
     except ImportError:
         print("Error: plotly is required for 3D plotting. Install it with: pip install plotly")
         return
     
+    # Get trajectory data
     x_coords, y_coords, eles = track.get_trajectory_data()
     
-    # Apply elevation scaling
+    # Convert elevations to feet for display
+    eles_feet = [meters_to_feet(ele) for ele in eles]
+    
+    # Apply elevation scaling for 3D plot
     scaled_eles = [ele * elevation_scale for ele in eles]
     
-    # Create the main 3D scatter plot
+    # Create subplot layout: 3D plot on top, elevation and speed charts below
+    fig = make_subplots(
+        rows=3, cols=1,
+        row_heights=[0.6, 0.2, 0.2],
+        specs=[
+            [{"type": "scatter3d"}],
+            [{"type": "xy"}],
+            [{"type": "xy"}]
+        ],
+        subplot_titles=("3D Flight Trajectory", "Elevation vs Time", "Ground Speed vs Time"),
+        vertical_spacing=0.08
+    )
+    
+    # Create the 3D trajectory trace
     trajectory_trace = go.Scatter3d(
         x=x_coords,
         y=y_coords,
@@ -283,10 +416,10 @@ def plot_3d_trajectory(track: FlightTrack, output_file: str = 'flight_trajectory
         mode='lines+markers',
         marker=dict(
             size=3,
-            color=eles,  # Use original elevation for color scale
+            color=eles_feet,  # Use elevation in feet for color scale
             colorscale='Viridis',
             showscale=True,
-            colorbar=dict(title="Elevation (m)")
+            colorbar=dict(title="Elevation (ft)", x=1.02, y=0.8)  # Position colorbar to the right
         ),
         line=dict(
             color='darkblue',
@@ -296,12 +429,53 @@ def plot_3d_trajectory(track: FlightTrack, output_file: str = 'flight_trajectory
         hovertemplate='<b>Position</b><br>' +
                      'Easting: %{x:.1f}m<br>' +
                      'Northing: %{y:.1f}m<br>' +
-                     'Elevation: %{customdata:.1f}m<br>' +
+                     'Elevation: %{customdata:.1f}ft<br>' +
                      '<extra></extra>',
-        customdata=eles  # Pass original elevations for hover
+        customdata=eles_feet  # Pass elevations in feet for hover
     )
     
-    fig = go.Figure(data=[trajectory_trace])
+    # Add 3D trajectory to first subplot (row 1)
+    fig.add_trace(trajectory_trace, row=1, col=1)
+    
+    # Create elevation vs time chart
+    elevation_chart_data = create_elevation_time_chart(track)
+    if elevation_chart_data:
+        elevation_trace, elapsed_minutes, elevations_feet = elevation_chart_data
+        fig.add_trace(elevation_trace, row=2, col=1)
+        
+        # Update elevation chart layout
+        fig.update_xaxes(title_text="Time (minutes)", row=2, col=1)
+        fig.update_yaxes(title_text="Elevation (ft)", row=2, col=1)
+    else:
+        # Add a placeholder text if no time data
+        fig.add_annotation(
+            text="No time data available for elevation chart",
+            x=0.5, y=0.5,
+            xref="x2", yref="y2",
+            showarrow=False,
+            font=dict(size=12, color="gray"),
+            row=2, col=1
+        )
+    
+    # Create speed vs time chart
+    speed_chart_data = create_speed_time_chart(track)
+    if speed_chart_data:
+        speed_trace, elapsed_minutes_speed, speeds_mph = speed_chart_data
+        fig.add_trace(speed_trace, row=3, col=1)
+        
+        # Update speed chart layout
+        fig.update_xaxes(title_text="Time (minutes)", row=3, col=1)
+        fig.update_yaxes(title_text="Ground Speed (mph)", row=3, col=1)
+    else:
+        # Add a placeholder text if no time data
+        fig.add_annotation(
+            text="No time data available for speed chart",
+            x=0.5, y=0.5,
+            xref="x3", yref="y3",
+            showarrow=False,
+            font=dict(size=12, color="gray"),
+            row=3, col=1
+        )
     
     # Get reference coordinates for title
     ref_lat = track.points[0].lat if track.points else 0
@@ -310,16 +484,18 @@ def plot_3d_trajectory(track: FlightTrack, output_file: str = 'flight_trajectory
     # Update title to show elevation scaling if applied
     scale_info = f" (elevation scale: {elevation_scale}x)" if elevation_scale != 1.0 else ""
     
+    # Update 3D scene layout
     fig.update_layout(
-        title=f'Flight Trajectory 3D{scale_info}<br><sub>Coordinates in meters relative to origin: {ref_lat:.6f}°, {ref_lon:.6f}°</sub>',
+        title=f'Flight Analysis{scale_info}<br><sub>Coordinates in meters relative to origin: {ref_lat:.6f}°, {ref_lon:.6f}°</sub>',
         scene=dict(
             xaxis_title='Easting (m)',
             yaxis_title='Northing (m)', 
             zaxis_title=f'Elevation (m){" x" + str(elevation_scale) if elevation_scale != 1.0 else ""}',
             aspectmode='data'  # This ensures equal scaling on all axes
         ),
-        width=1000,
-        height=800
+        width=1400,
+        height=1000,  # Increased height for three charts
+        showlegend=True
     )
     
     fig.write_html(output_file)
@@ -379,7 +555,11 @@ def main():
         print(f"Total points: {len(track.points)}")
         print(f"Latitude range: {min(lats):.6f}° - {max(lats):.6f}°")
         print(f"Longitude range: {min(lons):.6f}° - {max(lons):.6f}°")
-        print(f"Elevation range: {min(eles):.1f}m - {max(eles):.1f}m")
+        
+        # Convert and display elevation in feet
+        eles_feet = [meters_to_feet(ele) for ele in eles]
+        print(f"Elevation range: {min(eles_feet):.1f}ft - {max(eles_feet):.1f}ft")
+        print(f"Elevation range (meters): {min(eles):.1f}m - {max(eles):.1f}m")
         
         # Calculate coordinate ranges in meters
         x_range = max(x_coords) - min(x_coords)

@@ -1097,31 +1097,6 @@ def plot_3d_trajectory(track: FlightTrack, output_file: str = 'flight_trajectory
         # Fallback to standard HTML output
         fig.write_html(output_file)
     
-    # Debug: Print the layout structure to understand axis naming
-    print("Layout axis structure:")
-    for attr in dir(fig.layout):
-        if 'axis' in attr.lower() and not attr.startswith('_'):
-            axis_obj = getattr(fig.layout, attr, None)
-            if axis_obj is not None:
-                print(f"  {attr}: exists")
-    
-    # Check if the subplot has different naming
-    print("Checking subplot structure...")
-    if hasattr(fig.layout, 'scene'):
-        print("  Has 3D scene")
-    if hasattr(fig.layout, 'xaxis'):
-        print(f"  xaxis domain: {getattr(fig.layout.xaxis, 'domain', 'none')}")
-    if hasattr(fig.layout, 'yaxis'):
-        print(f"  yaxis domain: {getattr(fig.layout.yaxis, 'domain', 'none')}")
-    if hasattr(fig.layout, 'xaxis2'):
-        print(f"  xaxis2 domain: {getattr(fig.layout.xaxis2, 'domain', 'none')}")
-    if hasattr(fig.layout, 'xaxis3'):
-        print(f"  xaxis3 domain: {getattr(fig.layout.xaxis3, 'domain', 'none')}")
-    if hasattr(fig.layout, 'xaxis4'):
-        print(f"  xaxis4 domain: {getattr(fig.layout.xaxis4, 'domain', 'none')}")
-    else:
-        print("  No xaxis4 found - this might be the issue!")
-    
     print(f"3D trajectory plot saved to {output_file}")
     print(f"All coordinates are in meters relative to origin: {ref_lat:.6f}°, {ref_lon:.6f}°")
     

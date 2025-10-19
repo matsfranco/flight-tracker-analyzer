@@ -1,15 +1,17 @@
-# flight-tracker-analyzer
-GPX processor to analyze Garmin Flight Activities data
+# Flight Tracker Analyzer
+GPX processor for analyzing flight data with interactive 3D visualization
 
 ## Overview
 
-This Python script processes GPX files from Garmin Flight Activities to extract and analyze flight data. It provides:
-- 3D trajectory visualization with elevation scaling
-- Horizontal speed calculation in knots (nautical miles per hour)
-- Vertical speed calculation in ft/min (feet per minute)
-- Flight area measurements in nautical miles (NM)
-- Elevation data in feet (ft)
-- Comprehensive flight statistics using aviation standard units
+This Python script processes GPX files to extract and analyze flight data with a focus on interactive visualization. Key features:
+
+- **Interactive 3D trajectory visualization** with dynamic time-based segmentation
+- **Synchronized multi-chart display** with elevation, vertical speed, and ground speed over time
+- **Time range navigation** with range slider and synchronized zooming/panning
+- **Aviation standard units** - speeds in knots, vertical rates in ft/min, distances in nautical miles
+- **Elevation scaling** for better visualization of altitude changes
+- **Dynamic 3D markers** that move with time range selections
+- **Comprehensive flight statistics** using aviation standard units
 
 ## Installation
 
@@ -52,32 +54,10 @@ python flight_tracker_analyzer.py sample_flight.gpx --plot --output my_flight.ht
 ### Command Line Options
 
 - `gpx_file`: Path to the GPX file (required)
-- `--plot`: Generate a 3D trajectory plot
+- `--plot`: Generate an interactive 3D trajectory plot with synchronized charts
 - `--output`: Specify output HTML file for the plot (default: flight_trajectory_3d.html)
-- `--elevation-scale`: Scale factor for elevation visualization (default: 1.0). Use values > 1.0 to exaggerate elevation changes (e.g., 10.0 for 10x scaling)
-- `--include-map`: Include background map information and external mapping links
-- `--stats`: Display flight statistics including speeds in knots, vertical speeds in ft/min, distances in nautical miles, and elevations in feet
-
-### Background Map Integration
-
-The `--include-map` option provides geographical context for your flight trajectory:
-
-```bash
-# Generate plot with mapping information
-python flight_tracker_analyzer.py flight.gpx --plot --include-map --elevation-scale 10.0
-```
-
-This feature provides:
-- **Ground reference plane** in the 3D visualization
-- **Direct links** to Google Maps, OpenStreetMap, and Google Earth Web
-- **Flight area coordinates** for use in external mapping tools
-- **Suggestions** for advanced GPS visualization tools
-
-**External Mapping Options:**
-- **Google Earth Pro/Web**: Import the GPX file directly for satellite imagery context
-- **QGIS**: Free GIS software for professional analysis with multiple map layers
-- **GPS Visualizer**: Online tool for quick map overlay visualization
-- **Garmin Connect**: If using Garmin devices, provides native mapping integration
+- `--elevation-scale`: Scale factor for elevation visualization (default: 1.0). Use values > 1.0 to exaggerate elevation changes (e.g., 5.0 for 5x scaling, 10.0 for 10x scaling)
+- `--stats`: Display comprehensive flight statistics
 
 ### Elevation Scaling for Better Visualization
 
@@ -118,82 +98,73 @@ The script extracts the following data from GPX files:
 
 **Horizontal Distances**: When time data is unavailable, distances between points are shown in nautical miles.
 
-### 3D Visualization
+## 🚀 Core Innovation
 
-The interactive 3D plot shows:
-- Flight path as a line with markers
-- Color-coded elevation in feet (using Viridis colorscale)
-- Interactive controls to rotate, zoom, and pan
-- Consistent meter-based coordinate system for spatial axes
-- Optional elevation scaling to emphasize vertical variations
-- Hover information showing actual coordinates and elevations in feet
-- Optimized layout with properly positioned colorbar and legend to avoid overlaps
+This project implements **time-aware 3D trajectory visualization** - a breakthrough feature that adds time as a 4th dimension to 3D flight paths. Unlike static 3D visualizations, this system dynamically segments the 3D trajectory based on time range selections, with start and end markers that move in real-time to reflect the selected time period.
 
-### Multiple Chart Display
+**Technical Achievement:**
+- Time data embedded as a 4th dimension in 3D traces using `customdata`
+- JavaScript event system that maps time ranges to 3D trajectory indices  
+- Dynamic trace updates using Plotly.restyle() for seamless marker movement
+- Synchronized multi-chart system with range slider control
 
-The visualization now includes four charts in a single view:
-- **3D Flight Trajectory** (top): Spatial view of the flight path with elevation scaling
-- **Elevation vs Time** (second): Shows altitude changes throughout the flight in feet
-- **Vertical Speed vs Time** (third): Displays climb/descent rates in ft/min over time with noise filtering
-- **Ground Speed vs Time** (bottom): Shows speed variations in knots over time with noise filtering
+## Key Features
 
-### Signal Smoothing
+### Interactive 3D Visualization
 
-Both vertical speed and ground speed charts include automatic noise filtering:
-- **Smoothed data** (thick lines): Moving average filtered signals showing overall trends
-- **Raw data** (thin dotted lines): Original unfiltered data for reference
+The centerpiece is an interactive HTML visualization with four synchronized charts:
+
+1. **3D Flight Trajectory** (top): Spatial view with dynamic time-based segmentation
+   - Full trajectory shown in light gray for context
+   - Active segment highlighted with color-coded elevation
+   - Dynamic start (green diamond) and end (red diamond) markers
+   - Interactive rotation, zoom, and pan controls
+   - Elevation scaling to emphasize altitude variations
+
+2. **Elevation vs Time**: Altitude changes throughout the flight in feet
+3. **Vertical Speed vs Time**: Climb/descent rates in ft/min with noise filtering  
+4. **Ground Speed vs Time**: Speed variations in knots with noise filtering
+
+### Revolutionary Time Navigation
+
+- **Range Slider**: Interactive time selection at the bottom of the visualization
+- **Dynamic 3D Segmentation**: The 3D chart updates in real-time to show only the selected time period
+- **Moving Markers**: Start and end markers dynamically move to reflect the selected time range
+- **Synchronized Charts**: All charts zoom and pan together automatically
+- **Seamless Integration**: Complete flight analysis with time-aware 3D trajectory
+
+### Advanced Signal Processing
+
+- **Smoothed data** (thick lines): Moving average filtered signals showing trends
+- **Raw data** (thin dotted lines): Original unfiltered data for reference  
 - **Adaptive filtering**: Window size automatically adjusts based on data density
-- **Better visualization**: Reduces high-frequency noise while preserving important flight patterns
-
-This is particularly useful for high-frequency GPS data where small measurement errors can create noisy speed profiles that obscure the actual flight characteristics.
-
-### Interactive Time Navigation
-
-The visualization includes comprehensive interactive time navigation features:
-- **Range Slider**: Located at the bottom of the ground speed chart for time selection and zooming
-- **Synchronized Charts**: All time-based charts (elevation, vertical speed, ground speed) are linked
-- **3D Trajectory Segmentation**: The 3D chart now shows trajectory segments corresponding to selected time ranges
-- **Visual Markers**: Start (green diamond) and end (red diamond) markers in the 3D visualization
-- **Zoom and Pan**: Use the range slider to zoom into specific time periods
-- **Synchronized Navigation**: When you zoom or pan on one chart, all charts (including 3D) follow
-- **Visual Indicators**: Clear instructions are provided in the interface
-
-**How to Use:**
-1. Use the range slider at the bottom to select a specific time range
-2. Drag the handles to zoom into interesting portions of the flight
-3. All charts will automatically synchronize to show the same time period
-4. The 3D chart will highlight the selected segment with start/end markers
-5. Hover over any point to see precise values at that moment
-
-**3D Trajectory Features:**
-- **Full trajectory** shown in light gray for context
-- **Active segment** highlighted with original colors and larger markers
-- **Start marker** (green diamond) shows the beginning of selected time range
-- **End marker** (red diamond) shows the end of selected time range
-- **Seamless integration** with all other charts for complete flight analysis
+- **Noise reduction**: Eliminates GPS measurement errors while preserving flight characteristics
 
 ## Sample Output
 
-When running with `--stats`, you'll see output like:
+When running with `--plot --stats`, you'll see:
+
+**Console Output:**
 ```
 Parsing GPX file: sample_flight.gpx
 Found 21 track points
+3D trajectory plot saved to flight_trajectory_3d.html
+Elevation scaled by factor: 5.0x
 
 === Flight Statistics ===
 Total points: 21
-Latitude range: 37.774900° - 37.784500°
-Longitude range: -122.419400° - -122.409500°
-Elevation range: 32.8ft - 1312.3ft
-Elevation range (meters): 10.0m - 400.0m
-Flight area: 0.5NM × 0.6NM (East-West × North-South)
-Flight area (meters): 870m × 1067m (East-West × North-South)
-Horizontal speed (avg): 4.5 knots (2.3 m/s)
-Horizontal speed (max): 4.6 knots (2.4 m/s)
-Vertical speed (avg): -0 ft/min (-0.00 m/s)
-Max climb rate: 328 ft/min (1.67 m/s)
-Max descent rate: -328 ft/min (-1.67 m/s)
 Flight duration: 10.0 minutes (0.17 hours)
+Elevation range: 32.8ft - 1312.3ft
+Flight area: 0.5NM × 0.6NM (East-West × North-South)
+Horizontal speed (avg): 4.5 knots (max: 4.6 knots)
+Vertical rates: Max climb: 328 ft/min, Max descent: -328 ft/min
 ```
+
+**Interactive Visualization:**
+- Opens `flight_trajectory_3d.html` in your browser
+- Four synchronized charts with time navigation
+- 3D trajectory with dynamic segmentation and moving markers
+- Range slider for interactive time period selection
 
 ## Aviation Units
 
@@ -237,27 +208,64 @@ for point in track.points:
     print(f"Lat: {point.lat}, Lon: {point.lon}, Elevation: {elevation_ft:.1f} ft")
 ```
 
-### Advanced Example
+## Interactive Usage Guide
 
-The `advanced_example.py` script demonstrates more sophisticated analysis:
+1. **Generate the visualization:**
+   ```bash
+   python flight_tracker_analyzer.py your_flight.gpx --plot --elevation-scale 5.0
+   ```
 
-```bash
-python advanced_example.py sample_flight.gpx
+2. **Open the HTML file** in your web browser
+
+3. **Use the time navigation:**
+   - Drag the range slider handles at the bottom to select time periods
+   - Watch the 3D trajectory update to show only the selected segment
+   - See the start and end markers move to new positions
+   - All charts automatically synchronize to the same time range
+
+4. **Explore the data:**
+   - Hover over any point for detailed information
+   - Rotate and zoom the 3D view for different perspectives
+   - Use the elevation scaling to better see altitude variations
+
+## Project Structure
+
+```
+flight-tracker-analyzer/
+├── flight_tracker_analyzer.py     # Main analysis script with interactive visualization
+├── test_flight_tracker_analyzer.py # Unit tests
+├── requirements.txt               # Python dependencies
+├── sample_flight.gpx             # Sample GPX file for testing
+├── activity_17627335103.gpx      # Larger sample flight (71 minutes)
+├── test_no_time.gpx              # Test file without timestamps
+└── README.md                     # This file
 ```
 
-This provides detailed statistics including:
-- Trajectory information with start/end positions
-- Elevation analysis (min, max, average, total gain)
-- Speed statistics (average, median, max, min, standard deviation)
-- Flight phase analysis (climbing, cruising, descending percentages)
-- Time and distance calculations
+## Development and Testing
+
+Run the unit tests:
+```bash
+python -m pytest test_flight_tracker_analyzer.py -v
+```
+
+Test with different GPX files:
+```bash
+# Short flight (10 minutes, 21 points)
+python flight_tracker_analyzer.py sample_flight.gpx --plot --stats
+
+# Longer flight (71 minutes, 2986 points)  
+python flight_tracker_analyzer.py activity_17627335103.gpx --plot --stats --elevation-scale 3
+```
 
 ## Requirements
 
 - Python 3.6+
-- plotly >= 5.0.0 (for 3D visualization)
-- requests >= 2.25.0 (for map integration)
-- Pillow >= 8.0.0 (for image processing, optional)
+- plotly >= 5.0.0 (for interactive 3D visualization)
+
+Install dependencies:
+```bash
+pip install -r requirements.txt
+```
 
 ## License
 

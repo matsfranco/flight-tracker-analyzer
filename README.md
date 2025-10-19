@@ -147,6 +147,31 @@ Both vertical speed and ground speed charts include automatic noise filtering:
 
 This is particularly useful for high-frequency GPS data where small measurement errors can create noisy speed profiles that obscure the actual flight characteristics.
 
+### Interactive Time Navigation
+
+The visualization includes comprehensive interactive time navigation features:
+- **Range Slider**: Located at the bottom of the ground speed chart for time selection and zooming
+- **Synchronized Charts**: All time-based charts (elevation, vertical speed, ground speed) are linked
+- **3D Trajectory Segmentation**: The 3D chart now shows trajectory segments corresponding to selected time ranges
+- **Visual Markers**: Start (green diamond) and end (red diamond) markers in the 3D visualization
+- **Zoom and Pan**: Use the range slider to zoom into specific time periods
+- **Synchronized Navigation**: When you zoom or pan on one chart, all charts (including 3D) follow
+- **Visual Indicators**: Clear instructions are provided in the interface
+
+**How to Use:**
+1. Use the range slider at the bottom to select a specific time range
+2. Drag the handles to zoom into interesting portions of the flight
+3. All charts will automatically synchronize to show the same time period
+4. The 3D chart will highlight the selected segment with start/end markers
+5. Hover over any point to see precise values at that moment
+
+**3D Trajectory Features:**
+- **Full trajectory** shown in light gray for context
+- **Active segment** highlighted with original colors and larger markers
+- **Start marker** (green diamond) shows the beginning of selected time range
+- **End marker** (red diamond) shows the end of selected time range
+- **Seamless integration** with all other charts for complete flight analysis
+
 ## Sample Output
 
 When running with `--stats`, you'll see output like:

@@ -10,6 +10,7 @@ latitude, longitude, and elevation data. It can:
 - Apply moving average filtering to reduce noise in speed signals
 - Display distances in nautical miles and elevations in feet
 - Show elevation, vertical speed, and ground speed variations over time
+- Provide interactive time navigation with synchronized chart zooming/panning
 """
 
 import xml.etree.ElementTree as ET
@@ -574,40 +575,156 @@ def plot_3d_trajectory(track: FlightTrack, output_file: str = 'flight_trajectory
         vertical_spacing=0.06
     )
     
-    # Create the 3D trajectory trace
-    trajectory_trace = go.Scatter3d(
-        x=x_coords,
-        y=y_coords,
-        z=scaled_eles,
-        mode='lines+markers',
-        marker=dict(
-            size=3,
-            color=eles_feet,  # Use elevation in feet for color scale
-            colorscale='Viridis',
-            showscale=True,
-            colorbar=dict(
-                title="Elevation (ft)", 
-                x=1.15,  # Move further right to avoid legend overlap
-                y=0.9,   # Position higher on the 3D chart
-                len=0.4, # Make it shorter
-                thickness=20 # Make it thinner
-            )  # Position colorbar away from legends
-        ),
-        line=dict(
-            color='darkblue',
-            width=2
-        ),
-        name='Flight Path',
-        hovertemplate='<b>Position</b><br>' +
-                     'Easting: %{x:.1f}m<br>' +
-                     'Northing: %{y:.1f}m<br>' +
-                     'Elevation: %{customdata:.1f}ft<br>' +
-                     '<extra></extra>',
-        customdata=eles_feet  # Pass elevations in feet for hover
-    )
-    
-    # Add 3D trajectory to first subplot (row 1)
-    fig.add_trace(trajectory_trace, row=1, col=1)
+    # Create 3D trajectory traces with time-based interactivity support
+    if track.points and track.points[0].time and track.points[-1].time:
+        # Calculate elapsed time in minutes for each point
+        start_time = track.points[0].time
+        elapsed_minutes = []
+        for point in track.points:
+            elapsed_min = (point.time - start_time).total_seconds() / 60.0
+            elapsed_minutes.append(elapsed_min)
+        
+        # Create full trajectory trace (initially visible) with time as 4th dimension
+        full_trajectory_trace = go.Scatter3d(
+            x=x_coords,
+            y=y_coords,
+            z=scaled_eles,
+            mode='lines',
+            line=dict(
+                color='lightgray',
+                width=1
+            ),
+            opacity=0.3,
+            name='Full Flight Path',
+            hovertemplate='<b>Full Trajectory</b><br>' +
+                         'Easting: %{x:.1f}m<br>' +
+                         'Northing: %{y:.1f}m<br>' +
+                         'Elevation: %{customdata[0]:.1f}ft<br>' +
+                         'Time: %{customdata[1]:.1f}min<br>' +
+                         '<extra></extra>',
+            customdata=[[eles_feet[i], elapsed_minutes[i]] for i in range(len(eles_feet))],
+            showlegend=True
+        )
+        
+        # Create active segment trace (will be updated by time selection)
+        active_trajectory_trace = go.Scatter3d(
+            x=x_coords,
+            y=y_coords,
+            z=scaled_eles,
+            mode='lines+markers',
+            marker=dict(
+                size=3,
+                color=eles_feet,  # Use elevation in feet for color scale
+                colorscale='Viridis',
+                showscale=True,
+                colorbar=dict(
+                    title="Elevation (ft)", 
+                    x=1.15,  # Move further right to avoid legend overlap
+                    y=0.9,   # Position higher on the 3D chart
+                    len=0.4, # Make it shorter
+                    thickness=20 # Make it thinner
+                )  # Position colorbar away from legends
+            ),
+            line=dict(
+                color='darkblue',
+                width=3
+            ),
+            name='Active Segment',
+            hovertemplate='<b>Active Trajectory</b><br>' +
+                         'Easting: %{x:.1f}m<br>' +
+                         'Northing: %{y:.1f}m<br>' +
+                         'Elevation: %{customdata[0]:.1f}ft<br>' +
+                         'Time: %{customdata[1]:.1f}min<br>' +
+                         '<extra></extra>',
+            customdata=[[eles_feet[i], elapsed_minutes[i]] for i in range(len(eles_feet))],
+            showlegend=True
+        )
+        
+        # Create start point marker
+        start_marker_trace = go.Scatter3d(
+            x=[x_coords[0]],
+            y=[y_coords[0]],
+            z=[scaled_eles[0]],
+            mode='markers',
+            marker=dict(
+                size=8,
+                color='green',
+                symbol='diamond'
+            ),
+            name='Start Point',
+            hovertemplate='<b>Flight Start</b><br>' +
+                         'Easting: %{x:.1f}m<br>' +
+                         'Northing: %{y:.1f}m<br>' +
+                         'Elevation: %{customdata[0]:.1f}ft<br>' +
+                         'Time: %{customdata[1]:.1f}min<br>' +
+                         '<extra></extra>',
+            customdata=[[eles_feet[0], elapsed_minutes[0]]],
+            showlegend=True
+        )
+        
+        # Create end point marker
+        end_marker_trace = go.Scatter3d(
+            x=[x_coords[-1]],
+            y=[y_coords[-1]],
+            z=[scaled_eles[-1]],
+            mode='markers',
+            marker=dict(
+                size=8,
+                color='red',
+                symbol='diamond'
+            ),
+            name='End Point',
+            hovertemplate='<b>Flight End</b><br>' +
+                         'Easting: %{x:.1f}m<br>' +
+                         'Northing: %{y:.1f}m<br>' +
+                         'Elevation: %{customdata[0]:.1f}ft<br>' +
+                         'Time: %{customdata[1]:.1f}min<br>' +
+                         '<extra></extra>',
+            customdata=[[eles_feet[-1], elapsed_minutes[-1]]],
+            showlegend=True
+        )
+        
+        # Add all 3D traces to first subplot (row 1)
+        fig.add_trace(full_trajectory_trace, row=1, col=1)
+        fig.add_trace(active_trajectory_trace, row=1, col=1)
+        fig.add_trace(start_marker_trace, row=1, col=1)
+        fig.add_trace(end_marker_trace, row=1, col=1)
+        
+    else:
+        # Fallback for data without time - single trajectory
+        trajectory_trace = go.Scatter3d(
+            x=x_coords,
+            y=y_coords,
+            z=scaled_eles,
+            mode='lines+markers',
+            marker=dict(
+                size=3,
+                color=eles_feet,  # Use elevation in feet for color scale
+                colorscale='Viridis',
+                showscale=True,
+                colorbar=dict(
+                    title="Elevation (ft)", 
+                    x=1.15,  # Move further right to avoid legend overlap
+                    y=0.9,   # Position higher on the 3D chart
+                    len=0.4, # Make it shorter
+                    thickness=20 # Make it thinner
+                )  # Position colorbar away from legends
+            ),
+            line=dict(
+                color='darkblue',
+                width=2
+            ),
+            name='Flight Path',
+            hovertemplate='<b>Position</b><br>' +
+                         'Easting: %{x:.1f}m<br>' +
+                         'Northing: %{y:.1f}m<br>' +
+                         'Elevation: %{customdata:.1f}ft<br>' +
+                         '<extra></extra>',
+            customdata=eles_feet  # Pass elevations in feet for hover
+        )
+        
+        # Add 3D trajectory to first subplot (row 1)
+        fig.add_trace(trajectory_trace, row=1, col=1)
     
     # Create elevation vs time chart
     elevation_chart_data = create_elevation_time_chart(track)
@@ -675,6 +792,46 @@ def plot_3d_trajectory(track: FlightTrack, output_file: str = 'flight_trajectory
             row=4, col=1
         )
     
+    # Add interactive time navigation functionality if we have time data
+    if track.points and track.points[0].time and track.points[-1].time:
+        # Calculate time range in minutes
+        start_time = track.points[0].time
+        end_time = track.points[-1].time
+        duration_minutes = (end_time - start_time).total_seconds() / 60.0
+        
+        # Add range slider to the bottom chart (Ground Speed - row 4) for time selection and zooming
+        fig.update_xaxes(
+            rangeslider=dict(
+                visible=True,
+                thickness=0.06,
+                bgcolor="rgba(150,150,150,0.1)",
+                borderwidth=1,
+                bordercolor="rgb(150,150,150)"
+            ),
+            type="linear",
+            range=[0, duration_minutes],  # Set initial range to full time span
+            row=4, col=1  # Ground speed chart (bottom chart)
+        )
+        
+        # Link all time-based x-axes for synchronized zooming/panning
+        fig.update_xaxes(matches='x3', row=2, col=1)  # Link elevation chart to ground speed chart
+        fig.update_xaxes(matches='x3', row=3, col=1)  # Link vertical speed chart to ground speed chart
+        # Row 4 (ground speed) already has the range slider
+        
+        # Add annotations to explain the interactive features
+        fig.add_annotation(
+            text="🎛️ Use the range slider below to zoom and navigate through time<br>"
+                 "📊 All time-based charts are synchronized",
+            x=0.5, y=0.02,
+            xref="paper", yref="paper",
+            showarrow=False,
+            font=dict(size=10, color="gray"),
+            bgcolor="rgba(255,255,255,0.8)",
+            bordercolor="gray",
+            borderwidth=1,
+            align="center"
+        )
+    
     # Get reference coordinates for title
     ref_lat = track.points[0].lat if track.points else 0
     ref_lon = track.points[0].lon if track.points else 0
@@ -703,9 +860,272 @@ def plot_3d_trajectory(track: FlightTrack, output_file: str = 'flight_trajectory
         )
     )
     
-    fig.write_html(output_file)
+    # Add JavaScript callback for range slider interaction with 3D chart
+    if elevation_chart_data and len(track.points) > 1:
+        # Create custom JavaScript for synchronized 3D behavior
+        # Calculate time data for JavaScript - use the same elapsed_minutes from 3D trace creation
+        start_time = track.points[0].time
+        elapsed_minutes_js = []
+        for point in track.points:
+            elapsed_min = (point.time - start_time).total_seconds() / 60.0
+            elapsed_minutes_js.append(elapsed_min)
+        
+        time_data_js = elapsed_minutes_js
+        total_time = elapsed_minutes_js[-1] if elapsed_minutes_js else 0
+        
+        custom_js = f"""
+        <script>
+        // Flight data for JavaScript processing
+        var flightTimeData = {time_data_js};
+        var flightTotalTime = {total_time};
+        
+        function updateTrajectory3D() {{
+            var gd = document.getElementById('{'{plot_div}'}');
+            if (!gd || !gd.layout || !gd.layout.xaxis3 || !gd.layout.xaxis3.range) {{
+                console.log('Cannot update 3D trajectory - missing plot or axis data');
+                return;
+            }}
+            
+            console.log('updateTrajectory3D called');
+            console.log('Current xaxis3 range:', gd.layout.xaxis3.range);
+            
+            var timeRange = gd.layout.xaxis3.range;
+            var startTime = timeRange[0];
+            var endTime = timeRange[1];
+            
+            // Find trace indices by name
+            var fullTrajectoryIdx = -1;
+            var activeTrajectoryIdx = -1;
+            var startMarkerIdx = -1;
+            var endMarkerIdx = -1;
+            
+            for (var i = 0; i < gd.data.length; i++) {{
+                if (gd.data[i].name === 'Full Flight Path') {{
+                    fullTrajectoryIdx = i;
+                }} else if (gd.data[i].name === 'Active Segment') {{
+                    activeTrajectoryIdx = i;
+                }} else if (gd.data[i].name === 'Start Point') {{
+                    startMarkerIdx = i;
+                }} else if (gd.data[i].name === 'End Point') {{
+                    endMarkerIdx = i;
+                }}
+            }}
+            
+            if (fullTrajectoryIdx === -1 || activeTrajectoryIdx === -1) return;
+            
+            // Get the full trajectory data
+            var fullTrace = gd.data[fullTrajectoryIdx];
+            if (!fullTrace.x || !fullTrace.y || !fullTrace.z) return;
+            
+            var fullX = fullTrace.x;
+            var fullY = fullTrace.y;
+            var fullZ = fullTrace.z;
+            var fullCustomData = fullTrace.customdata || [];
+            
+            // Find indices for the time range using embedded time data in customdata
+            var startIdx = 0;
+            var endIdx = fullCustomData.length - 1;
+            
+            // Check if customdata has the expected format [[elevation, time], ...]
+            if (!fullCustomData || !Array.isArray(fullCustomData[0])) {{
+                console.log('Warning: customdata format not as expected, falling back to flightTimeData');
+                // Fallback to external time data if available
+                if (typeof flightTimeData !== 'undefined') {{
+                    for (var i = 0; i < flightTimeData.length; i++) {{
+                        if (flightTimeData[i] >= startTime) {{
+                            startIdx = i;
+                            break;
+                        }}
+                    }}
+                    for (var i = flightTimeData.length - 1; i >= 0; i--) {{
+                        if (flightTimeData[i] <= endTime) {{
+                            endIdx = i;
+                            break;
+                        }}
+                    }}
+                }}
+            }} else {{
+                // Use embedded time data from customdata (time is at index 1)
+                for (var i = 0; i < fullCustomData.length; i++) {{
+                    if (fullCustomData[i][1] >= startTime) {{
+                        startIdx = i;
+                        break;
+                    }}
+                }}
+                for (var i = fullCustomData.length - 1; i >= 0; i--) {{
+                    if (fullCustomData[i][1] <= endTime) {{
+                        endIdx = i;
+                        break;
+                    }}
+                }}
+            }}
+            
+            // Ensure we have valid indices
+            if (startIdx > endIdx) {{
+                startIdx = endIdx;
+            }}
+            
+            console.log('Time range:', startTime, 'to', endTime);
+            console.log('Index range:', startIdx, 'to', endIdx);
+            
+            // Extract segment data
+            var segmentX = fullX.slice(startIdx, endIdx + 1);
+            var segmentY = fullY.slice(startIdx, endIdx + 1);
+            var segmentZ = fullZ.slice(startIdx, endIdx + 1);
+            var segmentCustomData = fullCustomData.slice(startIdx, endIdx + 1);
+            
+            // Extract elevation values for marker colors (elevation is at index 0)
+            var segmentColors = Array.isArray(segmentCustomData[0]) ? 
+                segmentCustomData.map(function(item) {{ return item[0]; }}) : 
+                segmentCustomData;
+            
+            console.log('Segment length:', segmentX.length);
+            
+            // Update active trajectory trace
+            if (activeTrajectoryIdx !== -1 && segmentX.length > 0) {{
+                Plotly.restyle(gd, {{
+                    'x': [segmentX],
+                    'y': [segmentY], 
+                    'z': [segmentZ],
+                    'marker.color': [segmentColors],
+                    'customdata': [segmentCustomData]
+                }}, activeTrajectoryIdx);
+            }}
+            
+            // Update start marker
+            if (startMarkerIdx !== -1 && segmentX.length > 0) {{
+                Plotly.restyle(gd, {{
+                    'x': [[segmentX[0]]],
+                    'y': [[segmentY[0]]],
+                    'z': [[segmentZ[0]]],
+                    'customdata': [[segmentCustomData[0]]]
+                }}, startMarkerIdx);
+            }}
+            
+            // Update end marker
+            if (endMarkerIdx !== -1 && segmentX.length > 0) {{
+                Plotly.restyle(gd, {{
+                    'x': [[segmentX[segmentX.length - 1]]],
+                    'y': [[segmentY[segmentY.length - 1]]],
+                    'z': [[segmentZ[segmentZ.length - 1]]],
+                    'customdata': [[segmentCustomData[segmentCustomData.length - 1]]]
+                }}, endMarkerIdx);
+            }}
+        }}
+        
+        // Set up event listeners with better timing
+        function setupEventListeners() {{
+            var gd = document.getElementById('{'{plot_div}'}');
+            if (gd && gd.data && gd.layout) {{
+                console.log('Setting up 3D trajectory event listeners');
+                
+                gd.on('plotly_relayout', function(eventdata) {{
+                    console.log('plotly_relayout event:', eventdata);
+                    if (eventdata && (eventdata['xaxis3.range[0]'] !== undefined || 
+                                    eventdata['xaxis3.range[1]'] !== undefined ||
+                                    eventdata['xaxis3.range'] !== undefined)) {{
+                        console.log('Time range changed, updating 3D trajectory');
+                        setTimeout(updateTrajectory3D, 100); // Slightly longer delay
+                    }}
+                }});
+                
+                console.log('Event listeners attached successfully');
+                return true;
+            }} else {{
+                console.log('Plot not ready yet, retrying...');
+                return false;
+            }}
+        }}
+        
+        // Try to set up listeners with retry logic
+        function trySetupListeners(attempts) {{
+            attempts = attempts || 0;
+            if (setupEventListeners() || attempts >= 20) {{
+                if (attempts >= 20) {{
+                    console.error('Failed to setup event listeners after 20 attempts');
+                }}
+                return;
+            }}
+            setTimeout(function() {{ trySetupListeners(attempts + 1); }}, 250);
+        }}
+        
+        // Start trying to set up listeners immediately
+        trySetupListeners();
+        
+        // Also try after DOM load as backup
+        document.addEventListener('DOMContentLoaded', function() {{
+            setTimeout(trySetupListeners, 500);
+        }});
+        </script>
+        """
+        
+        # Write HTML with custom JavaScript
+        html_string = fig.to_html(include_plotlyjs=True, div_id='plotly-div')
+        # Add test buttons for debugging
+        test_buttons = f"""
+        <div style="position: fixed; top: 10px; right: 10px; z-index: 9999;">
+            <button onclick="testUpdate()" style="padding: 10px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                Test 3D Update
+            </button>
+            <button onclick="showCurrentRange()" style="padding: 10px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; margin-left: 5px;">
+                Show Range
+            </button>
+        </div>
+        <script>
+        function testUpdate() {{
+            console.log('Manual test update triggered');
+            updateTrajectory3D();
+        }}
+        
+        function showCurrentRange() {{
+            var gd = document.getElementById('plotly-div');
+            if (gd && gd.layout && gd.layout.xaxis4) {{
+                alert('Current time range: ' + JSON.stringify(gd.layout.xaxis3.range));
+            }} else {{
+                alert('No plot or axis found');
+            }}
+        }}
+        </script>
+        """
+        
+        # Insert custom JavaScript and test buttons before closing body tag
+        html_string = html_string.replace('</body>', custom_js.replace('{plot_div}', 'plotly-div') + test_buttons + '</body>')
+        
+        with open(output_file, 'w', encoding='utf-8') as f:
+            f.write(html_string)
+    else:
+        # Fallback to standard HTML output
+        fig.write_html(output_file)
+    
+    # Debug: Print the layout structure to understand axis naming
+    print("Layout axis structure:")
+    for attr in dir(fig.layout):
+        if 'axis' in attr.lower() and not attr.startswith('_'):
+            axis_obj = getattr(fig.layout, attr, None)
+            if axis_obj is not None:
+                print(f"  {attr}: exists")
+    
+    # Check if the subplot has different naming
+    print("Checking subplot structure...")
+    if hasattr(fig.layout, 'scene'):
+        print("  Has 3D scene")
+    if hasattr(fig.layout, 'xaxis'):
+        print(f"  xaxis domain: {getattr(fig.layout.xaxis, 'domain', 'none')}")
+    if hasattr(fig.layout, 'yaxis'):
+        print(f"  yaxis domain: {getattr(fig.layout.yaxis, 'domain', 'none')}")
+    if hasattr(fig.layout, 'xaxis2'):
+        print(f"  xaxis2 domain: {getattr(fig.layout.xaxis2, 'domain', 'none')}")
+    if hasattr(fig.layout, 'xaxis3'):
+        print(f"  xaxis3 domain: {getattr(fig.layout.xaxis3, 'domain', 'none')}")
+    if hasattr(fig.layout, 'xaxis4'):
+        print(f"  xaxis4 domain: {getattr(fig.layout.xaxis4, 'domain', 'none')}")
+    else:
+        print("  No xaxis4 found - this might be the issue!")
+    
     print(f"3D trajectory plot saved to {output_file}")
     print(f"All coordinates are in meters relative to origin: {ref_lat:.6f}°, {ref_lon:.6f}°")
+    
+    return fig
 
 
 def main():

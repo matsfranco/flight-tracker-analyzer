@@ -59,7 +59,9 @@ class TestFlightTrack(unittest.TestCase):
         self.assertEqual(len(lats), 3)
         self.assertEqual(len(lons), 3)
         self.assertEqual(len(eles), 3)
-        self.assertEqual(lats[0], 37.7749)
+        # First point should be at origin (0,0) in relative coordinates
+        self.assertEqual(lats[0], 0.0)
+        self.assertEqual(lons[0], 0.0)
         self.assertEqual(eles[2], 100.0)
     
     def test_horizontal_speeds(self):

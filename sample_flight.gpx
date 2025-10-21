@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Flight Tracker Analyzer Test" 
+     xmlns="http://www.topografix.com/GPX/1/1"
+     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
+  <trk>
+    <name>Sample Flight Track</name>
+    <trkseg>
+      <trkpt lat="37.7749" lon="-122.4194">
+        <ele>10.0</ele>
+        <time>2025-10-18T10:00:00Z</time>
+      </trkpt>
+      <trkpt lat="37.7750" lon="-122.4190">
+        <ele>50.0</ele>
+        <time>2025-10-18T10:00:30Z</time>
+      </trkpt>
+      <trkpt lat="37.7755" lon="-122.4185">
+        <ele>100.0</ele>
+        <time>2025-10-18T10:01:00Z</time>
+      </trkpt>
+      <trkpt lat="37.7760" lon="-122.4180">
+        <ele>150.0</ele>
+        <time>2025-10-18T10:01:30Z</time>
+      </trkpt>
+      <trkpt lat="37.7765" lon="-122.4175">
+        <ele>200.0</ele>
+        <time>2025-10-18T10:02:00Z</time>
+      </trkpt>
+      <trkpt lat="37.7770" lon="-122.4170">
+        <ele>250.0</ele>
+        <time>2025-10-18T10:02:30Z</time>
+      </trkpt>
+      <trkpt lat="37.7775" lon="-122.4165">
+        <ele>300.0</ele>
+        <time>2025-10-18T10:03:00Z</time>
+      </trkpt>
+      <trkpt lat="37.7780" lon="-122.4160">
+        <ele>350.0</ele>
+        <time>2025-10-18T10:03:30Z</time>
+      </trkpt>
+      <trkpt lat="37.7785" lon="-122.4155">
+        <ele>380.0</ele>
+        <time>2025-10-18T10:04:00Z</time>
+      </trkpt>
+      <trkpt lat="37.7790" lon="-122.4150">
+        <ele>400.0</ele>
+        <time>2025-10-18T10:04:30Z</time>
+      </trkpt>
+      <trkpt lat="37.7795" lon="-122.4145">
+        <ele>400.0</ele>
+        <time>2025-10-18T10:05:00Z</time>
+      </trkpt>
+      <trkpt lat="37.7800" lon="-122.4140">
+        <ele>390.0</ele>
+        <time>2025-10-18T10:05:30Z</time>
+      </trkpt>
+      <trkpt lat="37.7805" lon="-122.4135">
+        <ele>370.0</ele>
+        <time>2025-10-18T10:06:00Z</time>
+      </trkpt>
+      <trkpt lat="37.7810" lon="-122.4130">
+        <ele>340.0</ele>
+        <time>2025-10-18T10:06:30Z</time>
+      </trkpt>
+      <trkpt lat="37.7815" lon="-122.4125">
+        <ele>300.0</ele>
+        <time>2025-10-18T10:07:00Z</time>
+      </trkpt>
+      <trkpt lat="37.7820" lon="-122.4120">
+        <ele>250.0</ele>
+        <time>2025-10-18T10:07:30Z</time>
+      </trkpt>
+      <trkpt lat="37.7825" lon="-122.4115">
+        <ele>200.0</ele>
+        <time>2025-10-18T10:08:00Z</time>
+      </trkpt>
+      <trkpt lat="37.7830" lon="-122.4110">
+        <ele>150.0</ele>
+        <time>2025-10-18T10:08:30Z</time>
+      </trkpt>
+      <trkpt lat="37.7835" lon="-122.4105">
+        <ele>100.0</ele>
+        <time>2025-10-18T10:09:00Z</time>
+      </trkpt>
+      <trkpt lat="37.7840" lon="-122.4100">
+        <ele>50.0</ele>
+        <time>2025-10-18T10:09:30Z</time>
+      </trkpt>
+      <trkpt lat="37.7845" lon="-122.4095">
+        <ele>10.0</ele>
+        <time>2025-10-18T10:10:00Z</time>
+      </trkpt>
+    </trkseg>
+  </trk>
+</gpx>
